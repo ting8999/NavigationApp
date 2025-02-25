@@ -4,8 +4,8 @@ module Gnc {
 
         # One async command/port is required for active components
         # This should be overridden by the developers with a useful command/port
-        @ TODO
-        async command TODO opcode 0
+        @ A command to force an EVR reporting lock status.
+        async command Gps_ReportLockStatus opcode 0
 
         ##############################################################################
         #### Uncomment the following examples to start customizing your component ####
@@ -55,6 +55,32 @@ module Gnc {
 
         @Port to set the value of a parameter
         param set port prmSetOut
+
+        async input port serialRecv: Drv.ByteStreamRecv
+        output port serialBufferOut: Fw.BufferSend
+        # ----------------------------------------------------------------------
+        # Events
+        # ----------------------------------------------------------------------
+        @ A notification on GPS lock acquired
+        event Gps_LockAquired severity activity high id 0 format "GPS lock acquired"
+
+        @ A warning on GPS lock lost
+        event Gps_LockLost severity warning high id 1 format "GPS lock lost"
+
+        # ----------------------------------------------------------------------
+        # Telemetry
+        # ----------------------------------------------------------------------
+        @ The current latitude
+        telemetry Gps_Latitude: F32 id 0
+
+        @ The current longitude
+        telemetry Gps_Longitude: F32 id 1
+
+        @ The current altitude
+        telemetry Gps_Altitude: F32 id 2
+
+        @ The current number of satilites
+        telemetry Gps_Count: U32 id 3
 
     }
 }
