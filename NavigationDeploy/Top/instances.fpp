@@ -8,6 +8,7 @@ module NavigationDeploy {
     constant QUEUE_SIZE = 10
     constant STACK_SIZE = 64 * 1024
   }
+  
 
   # ----------------------------------------------------------------------
   # Active component instances
@@ -87,6 +88,11 @@ module NavigationDeploy {
     stack size Default.STACK_SIZE \
     priority 96
 
+  instance Gps: Gnc.GPS base id 0x321 \
+    queue size Default.QUEUE_SIZE \
+    stack size Default.STACK_SIZE \
+    priority 96
+
   # ----------------------------------------------------------------------
   # Queued component instances
   # ----------------------------------------------------------------------
@@ -121,4 +127,9 @@ module NavigationDeploy {
 
   instance comStub: Svc.ComStub base id 0x4B00
 
+  instance GpsUart: Drv.LinuxUartDriver base id 0x481
+
+  # instance comm: Drv.ByteStreamDriverModel base id 0x621
+
+  instance staticMemory: Svc.StaticMemory base id 0x661
 }

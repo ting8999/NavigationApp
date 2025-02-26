@@ -41,6 +41,9 @@ module NavigationDeploy {
     instance rateGroupDriver
     instance textLogger
     instance systemResources
+    instance Gps
+    instance GpsUart
+    instance staticMemory
 
     # ----------------------------------------------------------------------
     # Pattern graph specifiers
@@ -135,6 +138,25 @@ module NavigationDeploy {
 
     connections NavigationDeploy {
       # Add here connections to user-defined components
+    }
+
+    connections Gps {
+      Gps.cmdRegOut[0] -> cmdDisp.compCmdReg[7]
+      cmdDisp.compCmdSend[7] -> Gps.cmdIn[0]
+      Gps.cmdResponseOut[0] -> cmdDisp.compCmdStat[0]
+      # Gps.eventOut[0] -> eventLogger.LogRecv[0] # error
+      GpsUart.Log[0] -> eventLogger.LogRecv[0]
+      GpsUart.LogText[0] -> textLogger.TextLogger[0]
+      # Gps.textEventOut[0] -> textLogger.TextLogger[0] # error
+      fileDownlink.textEventOut[0] -> textLogger.TextLogger[0]
+      # Gps.tlmOut[0] -> chanTlm.TlmRecv[0] # error
+      # GpsUart.Tlm[0] -> chanTlm.TlmRecv[0] # error
+      # GpsUart.Time[0] -> linuxTime.timeGetPort[0] # error
+      # Gps.Time[0] -> linuxTime.timeGetPort[0] # error
+      # blockDrv.Time[0] -> linuxTime.timeGetPort[0] # error
+      # GpsUart.serialRecv[0] -> Gps.serialRecv[0]
+      # Gps.serialBufferOut[0] -> GpsUart.readBufferSend[0]
+
     }
 
   }
