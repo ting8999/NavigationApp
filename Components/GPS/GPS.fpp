@@ -56,7 +56,9 @@ module Gnc {
         @Port to set the value of a parameter
         param set port prmSetOut
 
+        @Port that Recv data form divice
         async input port serialRecv: Drv.ByteStreamRecv
+        
         output port serialBufferOut: Fw.BufferSend
         # ----------------------------------------------------------------------
         # Events

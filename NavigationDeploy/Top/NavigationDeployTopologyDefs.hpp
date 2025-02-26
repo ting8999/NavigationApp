@@ -6,6 +6,7 @@
 #ifndef NAVIGATIONDEPLOY_NAVIGATIONDEPLOYTOPOLOGYDEFS_HPP
 #define NAVIGATIONDEPLOY_NAVIGATIONDEPLOYTOPOLOGYDEFS_HPP
 
+#include "Fw/Logger/Logger.hpp"
 #include "Drv/BlockDriver/BlockDriver.hpp"
 #include "Fw/Types/MallocAllocator.hpp"
 #include "NavigationDeploy/Top/FppConstantsAc.hpp"

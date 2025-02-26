@@ -91,7 +91,13 @@ module NavigationDeploy {
   instance Gps: Gnc.GPS base id 0x321 \
     queue size Default.QUEUE_SIZE \
     stack size Default.STACK_SIZE \
-    priority 96
+    priority 95 {
+      phase Fpp.ToCpp.Phases.configComponents """
+      Gps.start();
+      GpsUart.start();
+      (void) printf("serial thread ok\n");
+      """
+    }
 
   # ----------------------------------------------------------------------
   # Queued component instances
@@ -127,7 +133,17 @@ module NavigationDeploy {
 
   instance comStub: Svc.ComStub base id 0x4B00
 
-  instance GpsUart: Drv.LinuxUartDriver base id 0x481
+  instance GpsUart: Drv.LinuxUartDriver base id 0x481 {
+    phase Fpp.ToCpp.Phases.configComponents """
+    if (!GpsUart.open("/dev/ttyAMA1", Drv::LinuxUartDriver::BAUD_9600, Drv::LinuxUartDriver::NO_FLOW, Drv::LinuxUartDriver::PARITY_NONE, true)){
+      Fw::Logger::log("[ERROR] Failed to open GPS UART\\n");
+      // bool uart_connected = false;
+    } else {
+      Fw::Logger::log("[INFO] Opened GPS UART\\n");
+      // uart_connected = true;
+    }
+    """
+  }
 
   # instance comm: Drv.ByteStreamDriverModel base id 0x621
 

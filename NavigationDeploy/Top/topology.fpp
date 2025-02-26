@@ -138,17 +138,22 @@ module NavigationDeploy {
 
     connections NavigationDeploy {
       # Add here connections to user-defined components
+      # GpsUart.deallocate -> Gps.serialRecv
+      GpsUart.$recv -> Gps.serialRecv
+      # Gps.serialBufferOut -> GpsUart.allocate
+      # GpsUart.allocate -> Gps.read
+      # GpsUart.deallocate -> Gps.serialRecv
     }
 
     connections Gps {
-      Gps.cmdRegOut[0] -> cmdDisp.compCmdReg[7]
-      cmdDisp.compCmdSend[7] -> Gps.cmdIn[0]
-      Gps.cmdResponseOut[0] -> cmdDisp.compCmdStat[0]
+      Gps.cmdRegOut -> cmdDisp.compCmdReg
+      cmdDisp.compCmdSend -> Gps.cmdIn
+      Gps.cmdResponseOut -> cmdDisp.compCmdStat
       # Gps.eventOut[0] -> eventLogger.LogRecv[0] # error
-      GpsUart.Log[0] -> eventLogger.LogRecv[0]
-      GpsUart.LogText[0] -> textLogger.TextLogger[0]
+      GpsUart.Log -> eventLogger.LogRecv
+      GpsUart.LogText -> textLogger.TextLogger
       # Gps.textEventOut[0] -> textLogger.TextLogger[0] # error
-      fileDownlink.textEventOut[0] -> textLogger.TextLogger[0]
+      fileDownlink.textEventOut -> textLogger.TextLogger
       # Gps.tlmOut[0] -> chanTlm.TlmRecv[0] # error
       # GpsUart.Tlm[0] -> chanTlm.TlmRecv[0] # error
       # GpsUart.Time[0] -> linuxTime.timeGetPort[0] # error
@@ -156,7 +161,6 @@ module NavigationDeploy {
       # blockDrv.Time[0] -> linuxTime.timeGetPort[0] # error
       # GpsUart.serialRecv[0] -> Gps.serialRecv[0]
       # Gps.serialBufferOut[0] -> GpsUart.readBufferSend[0]
-
     }
 
   }
