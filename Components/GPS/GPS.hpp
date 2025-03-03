@@ -9,29 +9,37 @@
 
 #include "Components/GPS/GPSComponentAc.hpp"
 
-// Need to define the memory footprint of our buffers. This means defining a count of buffers, and how big each is. In
-// this example, we will allow the Gps component to manage its own buffers.
-#define NUM_UART_BUFFERS 20
-#define UART_READ_BUFF_SIZE 1024  // 1 kb
-#define GPS_READ_BUFF_SIZE 256  // 256 bytes
+#define GPS_DATA_LENGTH 1024    //bytes
 
 namespace Gnc {
 
   class GPS :
-    public GPSComponentBase {
-    // GpsPacket:
-    //   A structure containing the information in the GPS location packet received via the NMEA GPS receiver.
-    struct GpsPacket {
-      float utcTime;
-      float dmNS;
-      char northSouth;
-      float dmEW;
-      char eastWest;
-      unsigned int lock;
-      unsigned int count;
-      float filler;
-      float altitude;
-    };
+    public GPSComponentBase
+  {
+
+    /**
+   * GpsPacket:
+   *   A structure containing the information in the GPS location packet
+   * received via the NMEA GPS receiver.
+   */
+  struct GpsPacket {
+    float utcTime;           // 1) Time (UTC)
+    float latitude;          // 2) Latitude (in ddmm.mm format)
+    char northSouth;         // 3) N or S (North or South)
+    float longitude;         // 4) Longitude (in dddmm.mm format)
+    char eastWest;           // 5) E or W (East or West)
+    unsigned int gpsQuality; // 6) GPS Quality Indicator
+    unsigned int numSatellites; // 7) Number of satellites in view
+    float hdop;              // 8) Horizontal Dilution of Precision
+    float altitude;          // 9) Antenna Altitude above/below mean-sea-level (geoid)
+    char altitudeUnits;      // 10) Units of antenna altitude
+    float geoidalSeparation; // 11) Geoidal separation
+    char geoidalUnits;       // 12) Units of geoidal separation
+    float dgpsDataAge;       // 13) Age of differential GPS data
+    unsigned int dgpsStationId; // 14) Differential reference station ID
+};
+
+
     public:
 
       // ----------------------------------------------------------------------
@@ -43,31 +51,19 @@ namespace Gnc {
           const char* const compName //!< The component name
       );
 
-      //! Initialize object Gps
-      //!
-      void init(
-          const NATIVE_INT_TYPE queueDepth, /*!< The queue depth*/
-          const NATIVE_INT_TYPE instance = 0 /*!< The instance number*/
-      );
-
-      //! Preamble
-      //!
-      void preamble(void);
-
       //! Destroy GPS object
-      ~GPS(void);
+      ~GPS();
 
     PRIVATE:
       // ----------------------------------------------------------------------
-      // Handler implementations for user-defined typed input ports
+      // Handler implementations for typed input ports
       // ----------------------------------------------------------------------
 
-      //! Handler implementation for serialRecv
-      //!
-      void serialRecv_handler(
-          const NATIVE_INT_TYPE portNum, /*!< The port number*/
-          Fw::Buffer &serBuffer, /*!< Buffer containing data*/
-          const Drv::RecvStatus &serial_status /*!< Status of read*/
+      //! Handler implementation for recv
+      void recv_handler(
+        const NATIVE_INT_TYPE portNum, /*!< The port number*/
+        Fw::Buffer &recvBuffer, 
+        const Drv::RecvStatus &recvStatus 
       );
 
     PRIVATE:
@@ -80,17 +76,15 @@ namespace Gnc {
       //!
       //! A command to force an EVR reporting lock status.
       void Gps_ReportLockStatus_cmdHandler(
-          const FwOpcodeType opCode, //!< The opcode
-          const U32 cmdSeq //!< The command sequence number
+          const  FwOpcodeType opCode, //!< The opcode
+          U32 cmdSeq //!< The command sequence number
       ) override;
 
       //!< Has the device acquired GPS lock?
       bool m_locked;
       //!< Create member variables to store buffers and the data array that those buffers use for storage
-      Fw::Buffer m_recvBuffers[NUM_UART_BUFFERS];
-      BYTE m_uartBuffers[NUM_UART_BUFFERS][UART_READ_BUFF_SIZE];
-      char m_gps_buff[GPS_READ_BUFF_SIZE];
-      char m_nmea_buff[GPS_READ_BUFF_SIZE];
+      char m_uartBuffers[GPS_DATA_LENGTH];
+      U16 m_recvSize = 0;
 
   };
 

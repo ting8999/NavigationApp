@@ -7,24 +7,19 @@ module Gnc {
         @ A command to force an EVR reporting lock status.
         async command Gps_ReportLockStatus opcode 0
 
-        ##############################################################################
-        #### Uncomment the following examples to start customizing your component ####
-        ##############################################################################
+        ###############################################################################
+        # User Define Ports:                                                          #
+        ###############################################################################
 
-        # @ Example async command
-        # async command COMMAND_NAME(param_name: U32)
+        # sync input port ready: Drv.ByteStreamReady
 
-        # @ Example telemetry counter
-        # telemetry ExampleCounter: U64
+        sync input port $recv: Drv.ByteStreamRecv
 
-        # @ Example event
-        # event ExampleStateEvent(example_state: Fw.On) severity activity high id 0 format "State set to {}"
+        output port $send: Drv.ByteStreamSend
 
-        # @ Example port: receiving calls from the rate group
-        # sync input port run: Svc.Sched
+        output port allocate: Fw.BufferGet
 
-        # @ Example parameter
-        # param PARAMETER_NAME: U32
+        output port deallocate: Fw.BufferSend
 
         ###############################################################################
         # Standard AC Ports: Required for Channels, Events, Commands, and Parameters  #
@@ -56,10 +51,6 @@ module Gnc {
         @Port to set the value of a parameter
         param set port prmSetOut
 
-        @Port that Recv data form divice
-        async input port serialRecv: Drv.ByteStreamRecv
-        
-        output port serialBufferOut: Fw.BufferSend
         # ----------------------------------------------------------------------
         # Events
         # ----------------------------------------------------------------------

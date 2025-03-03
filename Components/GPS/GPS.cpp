@@ -17,38 +17,10 @@ namespace Gnc {
   // Component construction and destruction
   // ----------------------------------------------------------------------
 
-  GPS ::
-    GPS(const char* const compName) :
-      GPSComponentBase(compName),
-      // Initialize the lock to "false"
-      m_locked(false)
-  {
-
-  }
-
-  void GPS :: init(
-      const NATIVE_INT_TYPE queueDepth,
-      const NATIVE_INT_TYPE instance
-    )
-  {
-    GPSComponentBase::init(queueDepth, instance);
-    memset(m_gps_buff, '\0', GPS_READ_BUFF_SIZE * sizeof(char));
-    memset(m_nmea_buff, '\0', GPS_READ_BUFF_SIZE * sizeof(char));
-  }
-
-  //Step 0: The linux serial driver keeps its storage externally. This means that we need to supply it some buffers to
-  //        work with. This code will loop through our member variables holding the buffers and send them to the linux
-  //        serial driver.  'preamble' is automatically called after the system is constructed, before the system runs
-  //        at steady-state. This allows for initialization code that invokes working ports.
-  void GPS :: preamble(void)
-  {
-    for (NATIVE_INT_TYPE buffer = 0; buffer < NUM_UART_BUFFERS; buffer++) {
-      //Assign the raw data to the buffer. Make sure to include the side of the region assigned.
-      this->m_recvBuffers[buffer].setData((U8*)this->m_uartBuffers[buffer]);
-      this->m_recvBuffers[buffer].setSize(UART_READ_BUFF_SIZE);
-      // Invoke the port to send the buffer out.
-      this->serialBufferOut_out(0, this->m_recvBuffers[buffer]);
-    }
+  GPS :: GPS(const char* const compName) : GPSComponentBase(compName){
+    // Initialize the lock status to false
+    m_locked = false;
+    memset(this->m_uartBuffers, 0, sizeof(this->m_uartBuffers));
   }
 
   GPS ::
@@ -61,137 +33,85 @@ namespace Gnc {
   // Handler implementations for user-defined typed input ports
   // ----------------------------------------------------------------------
 
-  // Step 1: serialIn
-  //
-  // By implementing this "handler" we can respond to the serial device sending us data buffers containing the GPS
-  // data. This handles our serial messages. It should perform the actions we expect from the design phases.
-  void GPS :: serialRecv_handler(
-      const NATIVE_INT_TYPE portNum, /*!< The port number*/
-      Fw::Buffer &serBuffer, /*!< Buffer containing data*/
-      const Drv::RecvStatus &serial_status /*!< Status of read*/
-    )
-  {
-    // Local variable definitions
+  void GPS ::recv_handler(const NATIVE_INT_TYPE portNum,Fw::Buffer &recvBuffer,const Drv::RecvStatus &recvStatus){
     int status = 0;
-    float lat = 0.0f, lon = 0.0f;
+    U32 buffsize = recvBuffer.getSize();
+    char* ptr = reinterpret_cast<char*>(recvBuffer.getData());
     GpsPacket packet;
-    // Grab the size (used amount of the buffer) and a pointer to the data in the buffer
-    U32 buffsize = static_cast<U32>(serBuffer.getSize());
-    char* pointer = reinterpret_cast<char*>(serBuffer.getData());
-    // Check for invalid read status, log an error, return buffer and abort if there is a problem
-    // (void) printf("received\n");
-    if (serial_status != Drv::RecvStatus::RECV_OK) {
-      // Fw::Logger::logMsg("[WARNING] Received buffer with bad packet: %d\n", serial_status.e);
-      // We MUST return the buffer or the serial driver won't be able to reuse it. The same buffer send call is used
-      // as we did in "preamble".  Since the buffer's size was overwritten to hold the actual data size, we need to
-      // reset it to the full data block size before returning it.
-      serBuffer.setSize(UART_READ_BUFF_SIZE);
-      this->serialBufferOut_out(0, serBuffer);
-      return;
+
+    if (recvStatus != Drv::RecvStatus::RECV_OK) {
+        Fw::Logger::log("[WARNING] Received buffer with bad packet: %d\n", recvStatus);
+        this->deallocate_out(0, recvBuffer);
+        return;
     }
-    // If not enough data is available for a full messsage, return the buffer and abort.
-    // else if (buffsize < 24) {
-    //   // (void) printf("%d\n",buffsize);
-    //   // (void) printf("%s\n",pointer);
+    // append to recv buffer
+    if (this->m_recvSize < GPS_DATA_LENGTH){
+      // copy data to buffer
+      memcpy(&this->m_uartBuffers[this->m_recvSize], ptr, buffsize);
+      this->m_recvSize += buffsize;
+      this->m_uartBuffers[this->m_recvSize] = '\0';
+    } else {
       
-    //     // We MUST return the buffer or the serial driver won't be able to reuse it. The same buffer send call is used
-    //     // as we did in "preamble".  Since the buffer's size was overwritten to hold the actual data size, we need to
-    //     // reset it to the full data block size before returning it.
-    //     // serBuffer.setSize(UART_READ_BUFF_SIZE);
-    //     // this->serialBufferOut_out(0, serBuffer);
-    //     return;
-    // }
-    
-    //Step 2:
-    //  Parse the GPS message from the UART (looking for $GPGGA messages). This uses standard C functions to read all
-    //  the defined protocol messages into our GPS package struct. If all 9 items are parsed, we break. Otherwise we
-    //  continue to scan the block of data looking for messages further in.
-    serBuffer.setSize(UART_READ_BUFF_SIZE);
-    this->serialBufferOut_out(0, serBuffer);
-    // (void) printf("%d\n",buffsize);
-    // (void) printf("%s\n",pointer);
-    bool nmea_complete = false;
-    int buflen = strlen(m_gps_buff);
-    //  (void) printf("gps_buf_size: %d\n",buflen);
-    if (buflen + buffsize >= GPS_READ_BUFF_SIZE-1) 
-    {
-      (void) printf("gps buffer overflow\n");
-      return;
-    }
-    else
-    {
-      int catlen = 0;
-      for (U32 i = 0; i < buffsize; i++) {
-        strncat(m_gps_buff, pointer+i, 1);
-        catlen ++;
-        if(pointer[i]=='\n'){
-          nmea_complete = true;
-          m_gps_buff[buflen + i+1] = '\0';
-          strcpy(m_nmea_buff,m_gps_buff);
-          buflen = 0;
-          catlen = 0;
-          m_gps_buff[0] = '\0';
-          (void) printf("nmea_buf: %s\n",m_nmea_buff);
+      float time, latitude, longitude, altitude;
+      char ns, ew;
+      int quality, satellites;
+      float hdop, geoidheight;
+      ptr = this->m_uartBuffers;
+
+      while ((ptr = strstr(ptr, "$GPGGA")) != NULL) {
+        
+        int parsed = sscanf(ptr, "$GPGGA,%f,%f,%c,%f,%c,%d,%d,%f,%f,M,%f,M",
+                            &time, &latitude, &ns, &longitude, &ew, &quality, &satellites, &hdop, &altitude, &geoidheight);
+        if (parsed == 10) {
+            //printf("Time: %f, Latitude: %f%c, Longitude: %f%c, Quality: %d, Satellites: %d, HDOP: %f, Altitude: %f, GeoidHeight: %f\n",
+            //      time, latitude, ns, longitude, ew, quality, satellites, hdop, altitude, geoidheight);
+            break;
         }
-      }
-      m_gps_buff[buflen+catlen] = '\0';
-      // (void) printf("gps_buf: %s\n",m_gps_buff);
-    }
-    if(!nmea_complete) return;
-    // for (U32 i = 0; i < strlen(m_nmea_buff); i++) {
-    status = sscanf(m_nmea_buff, "$GNGGA,%f,%f,%c,%f,%c,%u,%u,%f,%f",
-        &packet.utcTime, &packet.dmNS, &packet.northSouth,
-        &packet.dmEW, &packet.eastWest, &packet.lock,
-        &packet.count, &packet.filler, &packet.altitude);
-    //Break when all GPS items are found
-    // if (status == 9) {
-    //     break;
-    // }
-    // // }
-    (void) printf("Status: %d\n",status);
-      // (void) printf("%s\n",pointer);
+        ptr++;  // Move to the next character to avoid infinite loop
       
-    //If we failed to find the GPGGA then return the buffer and abort.
-    if (status == 0) {
-        return;
+      }
+      //printf("Time: %f, Latitude: %f%c, Longitude: %f%c, Quality: %d, Satellites: %d, HDOP: %f, Altitude: %f, GeoidHeight: %f\n\n",
+      //            time, latitude, ns, longitude, ew, quality, satellites, hdop, altitude, geoidheight);
+      this->m_recvSize = 0;
+      
+      // set the packet data
+      packet.utcTime = time;
+      packet.latitude = latitude;
+      packet.northSouth = ns;
+      packet.longitude = longitude;
+      packet.eastWest = ew;
+      packet.gpsQuality = quality;
+      packet.numSatellites = satellites;
+      packet.hdop = hdop;
+      packet.altitude = altitude;        
+      packet.geoidalSeparation  = geoidheight;
+      
+      float lat_deg = (int)(packet.latitude / 100.0f);  // Extracting degrees from ddmm.mm format
+      float lat_min = packet.latitude - (lat_deg * 100.0f);  // Extracting minutes from ddmm.mm format
+      float lat = lat_deg + lat_min / 60.0f;  // Converting to decimal format
+      lat = lat * ((packet.northSouth == 'N') ? 1 : -1);  // Applying North/South orientation
+
+      float lon_deg = (int)(packet.longitude / 100.0f);  // Extracting degrees from dddmm.mm format
+      float lon_min = packet.longitude - (lon_deg * 100.0f);  // Extracting minutes from dddmm.mm format
+      float lon = lon_deg + lon_min / 60.0f;  // Converting to decimal format
+      lon = lon * ((packet.eastWest == 'E') ? 1 : -1);  // Applying East/West orientation
+
+      this->tlmWrite_Gps_Latitude(lat);
+      this->tlmWrite_Gps_Longitude(lon);
+      this->tlmWrite_Gps_Altitude(packet.altitude);
+      this->tlmWrite_Gps_Count(packet.numSatellites);
+
+      if (packet.gpsQuality == 0 && m_locked) {
+          m_locked = false;
+          this->log_WARNING_HI_Gps_LockLost();
+      } else if (packet.gpsQuality >= 1 && !m_locked) {
+          m_locked = true;
+          this->log_ACTIVITY_HI_Gps_LockAquired();
+      }
+
     }
-    // If we found some of the message but not all of the message, then log an error, return the buffer and exit.
-    else if (status != 9) {
-        // Fw::Logger::logMsg("[ERROR] GPS parsing failed: %d\n", status);
-        // We MUST return the buffer or the serial driver won't be able to reuse it. The same buffer send call is used
-        // as we did in "preamble".  Since the buffer's size was overwritten to hold the actual data size, we need to
-        // reset it to the full data block size before returning it.
-        return;
-    }
-    //GPS packet locations are of the form: ddmm.mmmm
-    //We will convert to lat/lon in degrees only before downlinking
-    //Latitude degrees, add on minutes (converted to degrees), multiply by direction
-    lat = (U32)(packet.dmNS/100.0f);
-    lat = lat + (packet.dmNS - (lat * 100.0f))/60.0f;
-    lat = lat * ((packet.northSouth == 'N') ? 1 : -1);
-    //Longitude degrees, add on minutes (converted to degrees), multiply by direction
-    lon = (U32)(packet.dmEW/100.0f);
-    lon = lon + (packet.dmEW - (lon * 100.0f))/60.f;
-    lon = lon * ((packet.eastWest == 'E') ? 1 : -1);
-    //Step 4: call the downlink functions to send down data
-    tlmWrite_Gps_Latitude(lat);
-    tlmWrite_Gps_Longitude(lon);
-    tlmWrite_Gps_Altitude(packet.altitude);
-    tlmWrite_Gps_Count(packet.count);
-    //Lock status update only if changed
-    //Step 5,6: note changed lock status
-    // Emit an event if the lock has been acquired, or lost
-    if (packet.lock == 0 && m_locked) {
-        m_locked = false;
-        log_WARNING_HI_Gps_LockLost();
-    } else if (packet.lock == 1 && !m_locked) {
-        m_locked = true;
-        log_ACTIVITY_HI_Gps_LockAquired();
-    }
-    // We MUST return the buffer or the serial driver won't be able to reuse it. The same buffer send call is used
-    // as we did in "preamble".  Since the buffer's size was overwritten to hold the actual data size, we need to
-    // reset it to the full data block size before returning it.
-  }
+    this->deallocate_out(0, recvBuffer);
+}
 
   // ----------------------------------------------------------------------
   // Command handler implementations
