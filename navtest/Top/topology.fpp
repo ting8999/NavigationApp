@@ -42,6 +42,15 @@ module navtest {
     instance textLogger
     instance systemResources
 
+    # custom components shared components
+    instance subsystemsFileUplinkBufferManager
+    instance subsystemsStaticMemory
+    # instance subsystemsFileUplink
+
+    # gps components
+    instance gps
+    instance gps_comm
+
     # ----------------------------------------------------------------------
     # Pattern graph specifiers
     # ----------------------------------------------------------------------
@@ -56,7 +65,7 @@ module navtest {
 
     text event connections instance textLogger
 
-    time connections instance chronoTime
+    time connections instance chronoTime # linuxTime (?)
 
     health connections instance $health
 
@@ -109,6 +118,7 @@ module navtest {
       rateGroup3.RateGroupMemberOut[0] -> $health.Run
       rateGroup3.RateGroupMemberOut[1] -> blockDrv.Sched
       rateGroup3.RateGroupMemberOut[2] -> bufferManager.schedIn
+      rateGroup3.RateGroupMemberOut[3] -> subsystemsFileUplinkBufferManager.schedIn
     }
 
     connections Sequencer {
@@ -133,9 +143,18 @@ module navtest {
       fileUplink.bufferSendOut -> bufferManager.bufferSendIn
     }
 
-    connections navtest {
-      # Add here connections to user-defined components
-    }
+    # connections SubsystemsSharedRessources {
+    #   subsystemsFileUplink.bufferSendOut -> subsystemsFileUplinkBufferManager.bufferSendIn
+    # }
+
+     connections gps {
+      gps.$send -> gps_comm.$send 
+      gps.allocate -> subsystemsFileUplinkBufferManager.bufferGetCallee
+      gps.deallocate -> subsystemsFileUplinkBufferManager.bufferSendIn
+      gps_comm.deallocate -> subsystemsFileUplinkBufferManager.bufferSendIn
+      gps_comm.allocate -> subsystemsFileUplinkBufferManager.bufferGetCallee
+      gps_comm.$recv -> gps.$recv
+     }
 
   }
 

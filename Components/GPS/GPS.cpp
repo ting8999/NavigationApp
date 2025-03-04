@@ -58,9 +58,9 @@ namespace Gnc {
       float hdop, geoidheight;
       ptr = this->m_uartBuffers;
 
-      while ((ptr = strstr(ptr, "$GPGGA")) != NULL) {
+      while ((ptr = strstr(ptr, "$GNGGA")) != NULL) {
         
-        int parsed = sscanf(ptr, "$GPGGA,%f,%f,%c,%f,%c,%d,%d,%f,%f,M,%f,M",
+        int parsed = sscanf(ptr, "$GNGGA,%f,%f,%c,%f,%c,%d,%d,%f,%f,M,%f,M",
                             &time, &latitude, &ns, &longitude, &ew, &quality, &satellites, &hdop, &altitude, &geoidheight);
         if (parsed == 10) {
             //printf("Time: %f, Latitude: %f%c, Longitude: %f%c, Quality: %d, Satellites: %d, HDOP: %f, Altitude: %f, GeoidHeight: %f\n",
