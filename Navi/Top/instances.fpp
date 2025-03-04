@@ -87,6 +87,23 @@ module Navi {
     stack size Default.STACK_SIZE \
     priority 96
 
+  instance gps: Gnc.GPS base id 0x0E30 \
+  queue size Default.QUEUE_SIZE \
+  stack size Default.STACK_SIZE \
+  priority 95
+
+  instance gps_comm: Drv.LinuxUartDriver base id 0x1030
+  
+  ## subsystems Shares Ressources
+  instance subsystemsFileUplink: Svc.FileUplink base id 0x1300 \
+    queue size 100 \
+    stack size Default.STACK_SIZE \
+    priority 100
+
+  instance subsystemsFileUplinkBufferManager: Svc.BufferManager base id 0x1400
+  
+  instance subsystemsStaticMemory: Svc.StaticMemory base id 0x1500
+
   # ----------------------------------------------------------------------
   # Queued component instances
   # ----------------------------------------------------------------------
@@ -110,6 +127,10 @@ module Navi {
   instance bufferManager: Svc.BufferManager base id 0x4400
 
   instance chronoTime: Svc.ChronoTime base id 0x4500
+
+  # instance linuxTime: Svc.Time base id 0x4500 \
+  #   type "Svc::LinuxTime" \
+  #   at "../../Svc/LinuxTime/LinuxTime.hpp"
 
   instance rateGroupDriver: Svc.RateGroupDriver base id 0x4600
 

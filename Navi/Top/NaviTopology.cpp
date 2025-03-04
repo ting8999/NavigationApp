@@ -49,12 +49,15 @@ enum TopologyConstants {
     COMM_PRIORITY = 100,
     // bufferManager constants
     FRAMER_BUFFER_SIZE = FW_MAX(FW_COM_BUFFER_MAX_SIZE, FW_FILE_BUFFER_MAX_SIZE + sizeof(U32)) + HASH_DIGEST_LENGTH + Svc::FpFrameHeader::SIZE,
-    FRAMER_BUFFER_COUNT = 30,
+    FRAMER_BUFFER_COUNT = 10,
     DEFRAMER_BUFFER_SIZE = FW_MAX(FW_COM_BUFFER_MAX_SIZE, FW_FILE_BUFFER_MAX_SIZE + sizeof(U32)),
-    DEFRAMER_BUFFER_COUNT = 30,
-    COM_DRIVER_BUFFER_SIZE = 3000,
-    COM_DRIVER_BUFFER_COUNT = 30,
-    BUFFER_MANAGER_ID = 200
+    DEFRAMER_BUFFER_COUNT = 10,
+    COM_DRIVER_BUFFER_SIZE = 491520,
+    COM_DRIVER_BUFFER_COUNT = 20,
+    BUFFER_MANAGER_ID = 200,
+    SUBSYSTEMS_DRIVER_BUFFER_SIZE = 491520,
+    SUBSYSTEMS_DRIVER_BUFFER_COUNT = 30,
+    SUBSYSTEMS_BUFFER_MANAGER_ID = 201
 };
 
 // Ping entries are autocoded, however; this code is not properly exported. Thus, it is copied here.
@@ -101,6 +104,7 @@ void configureTopology(const TopologyState& state) {
 
     // Rate group driver needs a divisor list
     rateGroupDriver.configure(rateGroupDivisorsSet);
+    // rateGroupDriver.configure(rateGroupDivisors, FW_NUM_ARRAY_ELEMENTS(rateGroupDivisors)); // form MESMO
 
     // Rate groups require context arrays.
     rateGroup1.configure(rateGroup1Context, FW_NUM_ARRAY_ELEMENTS(rateGroup1Context));
@@ -117,6 +121,25 @@ void configureTopology(const TopologyState& state) {
 
     // Health is supplied a set of ping entires.
     health.setPingEntries(pingEntries, FW_NUM_ARRAY_ELEMENTS(pingEntries), HEALTH_WATCHDOG_CODE);
+    
+    // new added
+    Svc::BufferManager::BufferBins subsystemsBuffMgrBins;
+    memset(&subsystemsBuffMgrBins, 0, sizeof(subsystemsBuffMgrBins));
+    subsystemsBuffMgrBins.bins[0].bufferSize = SUBSYSTEMS_DRIVER_BUFFER_SIZE;
+    subsystemsBuffMgrBins.bins[0].numBuffers = SUBSYSTEMS_DRIVER_BUFFER_COUNT;
+    subsystemsBuffMgrBins.bins[1].bufferSize = SUBSYSTEMS_DRIVER_BUFFER_SIZE;
+    subsystemsBuffMgrBins.bins[1].numBuffers = SUBSYSTEMS_DRIVER_BUFFER_COUNT;
+    subsystemsBuffMgrBins.bins[2].bufferSize = SUBSYSTEMS_DRIVER_BUFFER_SIZE;
+    subsystemsBuffMgrBins.bins[2].numBuffers = SUBSYSTEMS_DRIVER_BUFFER_COUNT;
+    subsystemsBuffMgrBins.bins[3].bufferSize = 2048;
+    subsystemsBuffMgrBins.bins[3].numBuffers = 20;
+    subsystemsBuffMgrBins.bins[4].bufferSize = 2048;
+    subsystemsBuffMgrBins.bins[4].numBuffers = 20;
+    subsystemsBuffMgrBins.bins[5].bufferSize = 2048;
+    subsystemsBuffMgrBins.bins[5].numBuffers = 20;
+    subsystemsBuffMgrBins.bins[5].bufferSize = 2048;
+    subsystemsBuffMgrBins.bins[5].numBuffers = 20;
+    subsystemsFileUplinkBufferManager.setup(SUBSYSTEMS_BUFFER_MANAGER_ID, 0, mallocator, subsystemsBuffMgrBins);
 
     // Note: Uncomment when using Svc:TlmPacketizer
     // tlmSend.setPacketList(NaviPacketsPkts, NaviPacketsIgnore, 1);
@@ -159,6 +182,20 @@ void setupTopology(const TopologyState& state) {
         // Uplink is configured for receive so a socket task is started
         comDriver.start(name, COMM_PRIORITY, Default::STACK_SIZE);
     }
+
+    // GPS
+    if (state.gpsComm == nullptr) {
+        printf("GPS Comm is null. Defaulting to ttyAMA1\n");
+        bool gps_com_open = gps_comm.open("/dev/ttyAMA1", Drv::LinuxUartDriver::BAUD_9600, Drv::LinuxUartDriver::NO_FLOW, Drv::LinuxUartDriver::PARITY_NONE, true);
+        printf("GPS Driver Open : %d\n", gps_com_open);
+        gps_comm.start();
+        printf("GPS start \n");
+    }else{
+        bool gps_com_open = gps_comm.open(state.gpsComm, Drv::LinuxUartDriver::BAUD_9600, Drv::LinuxUartDriver::NO_FLOW, Drv::LinuxUartDriver::PARITY_NONE, true);
+        printf("GPS Driver Open : %d\n", gps_com_open);
+        gps_comm.start();
+    }
+
 }
 
 // Variables used for cycle simulation
@@ -199,5 +236,6 @@ void teardownTopology(const TopologyState& state) {
     // Resource deallocation
     cmdSeq.deallocateBuffer(mallocator);
     bufferManager.cleanup();
+    subsystemsFileUplinkBufferManager.cleanup();
 }
 };  // namespace Navi
