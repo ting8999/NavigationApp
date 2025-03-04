@@ -1,24 +1,22 @@
 // ======================================================================
-// \title  NavigationDeployTopology.cpp
+// \title  navtestTopology.cpp
 // \brief cpp file containing the topology instantiation code
 //
 // ======================================================================
 // Provides access to autocoded functions
-#include <NavigationDeploy/Top/NavigationDeployTopologyAc.hpp>
+#include <navtest/Top/navtestTopologyAc.hpp>
 // Note: Uncomment when using Svc:TlmPacketizer
-//#include <NavigationDeploy/Top/NavigationDeployPacketsAc.hpp>
+//#include <navtest/Top/navtestPacketsAc.hpp>
 
 // Necessary project-specified types
 #include <Fw/Types/MallocAllocator.hpp>
-// #include <Os/Log.hpp>
 #include <Svc/FramingProtocol/FprimeProtocol.hpp>
-#include <Svc/FramingProtocol/DeframingProtocol.hpp>
 
 // Used for 1Hz synthetic cycling
 #include <Os/Mutex.hpp>
 
 // Allows easy reference to objects in FPP/autocoder required namespaces
-using namespace NavigationDeploy;
+using namespace navtest;
 
 // The reference topology uses a malloc-based allocator for components that need to allocate memory during the
 // initialization phase.
@@ -51,31 +49,28 @@ enum TopologyConstants {
     COMM_PRIORITY = 100,
     // bufferManager constants
     FRAMER_BUFFER_SIZE = FW_MAX(FW_COM_BUFFER_MAX_SIZE, FW_FILE_BUFFER_MAX_SIZE + sizeof(U32)) + HASH_DIGEST_LENGTH + Svc::FpFrameHeader::SIZE,
-    FRAMER_BUFFER_COUNT = 10,
+    FRAMER_BUFFER_COUNT = 30,
     DEFRAMER_BUFFER_SIZE = FW_MAX(FW_COM_BUFFER_MAX_SIZE, FW_FILE_BUFFER_MAX_SIZE + sizeof(U32)),
-    DEFRAMER_BUFFER_COUNT = 10,
-    COM_DRIVER_BUFFER_SIZE = 491520,
-    COM_DRIVER_BUFFER_COUNT = 20,
-    BUFFER_MANAGER_ID = 200,
-    SUBSYSTEMS_DRIVER_BUFFER_SIZE = 491520,
-    SUBSYSTEMS_DRIVER_BUFFER_COUNT = 30,
-    SUBSYSTEMS_BUFFER_MANAGER_ID = 201
+    DEFRAMER_BUFFER_COUNT = 30,
+    COM_DRIVER_BUFFER_SIZE = 3000,
+    COM_DRIVER_BUFFER_COUNT = 30,
+    BUFFER_MANAGER_ID = 200
 };
 
 // Ping entries are autocoded, however; this code is not properly exported. Thus, it is copied here.
 Svc::Health::PingEntry pingEntries[] = {
-    {PingEntries::NavigationDeploy_blockDrv::WARN, PingEntries::NavigationDeploy_blockDrv::FATAL, "blockDrv"},
-    {PingEntries::NavigationDeploy_tlmSend::WARN, PingEntries::NavigationDeploy_tlmSend::FATAL, "chanTlm"},
-    {PingEntries::NavigationDeploy_cmdDisp::WARN, PingEntries::NavigationDeploy_cmdDisp::FATAL, "cmdDisp"},
-    {PingEntries::NavigationDeploy_cmdSeq::WARN, PingEntries::NavigationDeploy_cmdSeq::FATAL, "cmdSeq"},
-    {PingEntries::NavigationDeploy_eventLogger::WARN, PingEntries::NavigationDeploy_eventLogger::FATAL, "eventLogger"},
-    {PingEntries::NavigationDeploy_fileDownlink::WARN, PingEntries::NavigationDeploy_fileDownlink::FATAL, "fileDownlink"},
-    {PingEntries::NavigationDeploy_fileManager::WARN, PingEntries::NavigationDeploy_fileManager::FATAL, "fileManager"},
-    {PingEntries::NavigationDeploy_fileUplink::WARN, PingEntries::NavigationDeploy_fileUplink::FATAL, "fileUplink"},
-    {PingEntries::NavigationDeploy_prmDb::WARN, PingEntries::NavigationDeploy_prmDb::FATAL, "prmDb"},
-    {PingEntries::NavigationDeploy_rateGroup1::WARN, PingEntries::NavigationDeploy_rateGroup1::FATAL, "rateGroup1"},
-    {PingEntries::NavigationDeploy_rateGroup2::WARN, PingEntries::NavigationDeploy_rateGroup2::FATAL, "rateGroup2"},
-    {PingEntries::NavigationDeploy_rateGroup3::WARN, PingEntries::NavigationDeploy_rateGroup3::FATAL, "rateGroup3"},
+    {PingEntries::navtest_blockDrv::WARN, PingEntries::navtest_blockDrv::FATAL, "blockDrv"},
+    {PingEntries::navtest_tlmSend::WARN, PingEntries::navtest_tlmSend::FATAL, "chanTlm"},
+    {PingEntries::navtest_cmdDisp::WARN, PingEntries::navtest_cmdDisp::FATAL, "cmdDisp"},
+    {PingEntries::navtest_cmdSeq::WARN, PingEntries::navtest_cmdSeq::FATAL, "cmdSeq"},
+    {PingEntries::navtest_eventLogger::WARN, PingEntries::navtest_eventLogger::FATAL, "eventLogger"},
+    {PingEntries::navtest_fileDownlink::WARN, PingEntries::navtest_fileDownlink::FATAL, "fileDownlink"},
+    {PingEntries::navtest_fileManager::WARN, PingEntries::navtest_fileManager::FATAL, "fileManager"},
+    {PingEntries::navtest_fileUplink::WARN, PingEntries::navtest_fileUplink::FATAL, "fileUplink"},
+    {PingEntries::navtest_prmDb::WARN, PingEntries::navtest_prmDb::FATAL, "prmDb"},
+    {PingEntries::navtest_rateGroup1::WARN, PingEntries::navtest_rateGroup1::FATAL, "rateGroup1"},
+    {PingEntries::navtest_rateGroup2::WARN, PingEntries::navtest_rateGroup2::FATAL, "rateGroup2"},
+    {PingEntries::navtest_rateGroup3::WARN, PingEntries::navtest_rateGroup3::FATAL, "rateGroup3"},
 };
 
 /**
@@ -86,12 +81,26 @@ Svc::Health::PingEntry pingEntries[] = {
  * desired, but is extracted here for clarity.
  */
 void configureTopology(const TopologyState& state) {
+    // Buffer managers need a configured set of buckets and an allocator used to allocate memory for those buckets.
+    Svc::BufferManager::BufferBins upBuffMgrBins;
+    memset(&upBuffMgrBins, 0, sizeof(upBuffMgrBins));
+    upBuffMgrBins.bins[0].bufferSize = FRAMER_BUFFER_SIZE;
+    upBuffMgrBins.bins[0].numBuffers = FRAMER_BUFFER_COUNT;
+    upBuffMgrBins.bins[1].bufferSize = DEFRAMER_BUFFER_SIZE;
+    upBuffMgrBins.bins[1].numBuffers = DEFRAMER_BUFFER_COUNT;
+    upBuffMgrBins.bins[2].bufferSize = COM_DRIVER_BUFFER_SIZE;
+    upBuffMgrBins.bins[2].numBuffers = COM_DRIVER_BUFFER_COUNT;
+    bufferManager.setup(BUFFER_MANAGER_ID, 0, mallocator, upBuffMgrBins);
+
+    // Framer and Deframer components need to be passed a protocol handler
+    framer.setup(framing);
+    deframer.setup(deframing);
+
     // Command sequencer needs to allocate memory to hold contents of command sequences
     cmdSeq.allocateBuffer(0, mallocator, CMD_SEQ_BUFFER_SIZE);
 
     // Rate group driver needs a divisor list
     rateGroupDriver.configure(rateGroupDivisorsSet);
-    // rateGroupDriver.configure(rateGroupDivisors, FW_NUM_ARRAY_ELEMENTS(rateGroupDivisors)); // form MESMO
 
     // Rate groups require context arrays.
     rateGroup1.configure(rateGroup1Context, FW_NUM_ARRAY_ELEMENTS(rateGroup1Context));
@@ -108,43 +117,9 @@ void configureTopology(const TopologyState& state) {
 
     // Health is supplied a set of ping entires.
     health.setPingEntries(pingEntries, FW_NUM_ARRAY_ELEMENTS(pingEntries), HEALTH_WATCHDOG_CODE);
-    
-   // Buffer managers need a configured set of buckets and an allocator used to allocate memory for those buckets.
-    Svc::BufferManager::BufferBins upBuffMgrBins;
-    memset(&upBuffMgrBins, 0, sizeof(upBuffMgrBins));
-    upBuffMgrBins.bins[0].bufferSize = FRAMER_BUFFER_SIZE;
-    upBuffMgrBins.bins[0].numBuffers = FRAMER_BUFFER_COUNT;
-    upBuffMgrBins.bins[1].bufferSize = DEFRAMER_BUFFER_SIZE;
-    upBuffMgrBins.bins[1].numBuffers = DEFRAMER_BUFFER_COUNT;
-    upBuffMgrBins.bins[2].bufferSize = COM_DRIVER_BUFFER_SIZE;
-    upBuffMgrBins.bins[2].numBuffers = COM_DRIVER_BUFFER_COUNT;
-    bufferManager.setup(BUFFER_MANAGER_ID, 0, mallocator, upBuffMgrBins);
-    
-    // new added
-    Svc::BufferManager::BufferBins subsystemsBuffMgrBins;
-    memset(&subsystemsBuffMgrBins, 0, sizeof(subsystemsBuffMgrBins));
-    subsystemsBuffMgrBins.bins[0].bufferSize = SUBSYSTEMS_DRIVER_BUFFER_SIZE;
-    subsystemsBuffMgrBins.bins[0].numBuffers = SUBSYSTEMS_DRIVER_BUFFER_COUNT;
-    subsystemsBuffMgrBins.bins[1].bufferSize = SUBSYSTEMS_DRIVER_BUFFER_SIZE;
-    subsystemsBuffMgrBins.bins[1].numBuffers = SUBSYSTEMS_DRIVER_BUFFER_COUNT;
-    subsystemsBuffMgrBins.bins[2].bufferSize = SUBSYSTEMS_DRIVER_BUFFER_SIZE;
-    subsystemsBuffMgrBins.bins[2].numBuffers = SUBSYSTEMS_DRIVER_BUFFER_COUNT;
-    subsystemsBuffMgrBins.bins[3].bufferSize = 2048;
-    subsystemsBuffMgrBins.bins[3].numBuffers = 20;
-    subsystemsBuffMgrBins.bins[4].bufferSize = 2048;
-    subsystemsBuffMgrBins.bins[4].numBuffers = 20;
-    subsystemsBuffMgrBins.bins[5].bufferSize = 2048;
-    subsystemsBuffMgrBins.bins[5].numBuffers = 20;
-    subsystemsBuffMgrBins.bins[5].bufferSize = 2048;
-    subsystemsBuffMgrBins.bins[5].numBuffers = 20;
-    subsystemsFileUplinkBufferManager.setup(SUBSYSTEMS_BUFFER_MANAGER_ID, 0, mallocator, subsystemsBuffMgrBins);
-
-    // Framer and Deframer components need to be passed a protocol handler
-    framer.setup(framing);
-    deframer.setup(deframing);
 
     // Note: Uncomment when using Svc:TlmPacketizer
-    // tlmSend.setPacketList(NavigationDeployPacketsPkts, NavigationDeployPacketsIgnore, 1);
+    // tlmSend.setPacketList(navtestPacketsPkts, navtestPacketsIgnore, 1);
 
     // Events (highest-priority)
     configurationTable.entries[0] = {.depth = 100, .priority = 0};
@@ -156,12 +131,11 @@ void configureTopology(const TopologyState& state) {
     comQueue.configure(configurationTable, 0, mallocator);
     if (state.hostname != nullptr && state.port != 0) {
         comDriver.configure(state.hostname, state.port);
-        // comDriver.startSocketTask(hostname);
     }
 }
 
-// Public functions for use in main program are namespaced with deployment name NavigationDeploy
-namespace NavigationDeploy {
+// Public functions for use in main program are namespaced with deployment name navtest
+namespace navtest {
 void setupTopology(const TopologyState& state) {
     // Autocoded initialization. Function provided by autocoder.
     initComponents(state);
@@ -179,18 +153,11 @@ void setupTopology(const TopologyState& state) {
     loadParameters();
     // Autocoded task kick-off (active components). Function provided by autocoder.
     startTasks(state);
-
-    //GPS
-    if (state.gpsComm == nullptr) {
-        printf("GPS Comm is null. Defaulting to ttyAMA1\n");
-        bool gps_com_open = gps_comm.open("/dev/ttyAMA1", Drv::LinuxUartDriver::BAUD_9600, Drv::LinuxUartDriver::NO_FLOW, Drv::LinuxUartDriver::PARITY_NONE, true);
-        printf("GPS Driver Open : %d\n", gps_com_open);
-        gps_comm.start();
-        printf("GPS start \n");
-    }else{
-        bool gps_com_open = gps_comm.open(state.gpsComm, Drv::LinuxUartDriver::BAUD_9600, Drv::LinuxUartDriver::NO_FLOW, Drv::LinuxUartDriver::PARITY_NONE, true);
-        printf("GPS Driver Open : %d\n", gps_com_open);
-        gps_comm.start();
+    // Initialize socket communication if and only if there is a valid specification
+    if (state.hostname != nullptr && state.port != 0) {
+        Os::TaskString name("ReceiveTask");
+        // Uplink is configured for receive so a socket task is started
+        comDriver.start(name, COMM_PRIORITY, Default::STACK_SIZE);
     }
 }
 
@@ -205,7 +172,7 @@ void startSimulatedCycle(Fw::TimeInterval interval) {
 
     // Main loop
     while (cycling) {
-        NavigationDeploy::blockDrv.callIsr();
+        navtest::blockDrv.callIsr();
         Os::Task::delay(interval);
 
         cycleLock.lock();
@@ -232,6 +199,5 @@ void teardownTopology(const TopologyState& state) {
     // Resource deallocation
     cmdSeq.deallocateBuffer(mallocator);
     bufferManager.cleanup();
-    subsystemsFileUplinkBufferManager.cleanup();
 }
-};  // namespace NavigationDeploy
+};  // namespace navtest
