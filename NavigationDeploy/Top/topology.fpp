@@ -41,9 +41,15 @@ module NavigationDeploy {
     instance rateGroupDriver
     instance textLogger
     instance systemResources
-    instance Gps
-    instance GpsUart
-    instance staticMemory
+
+    # custom components shared components
+    instance subsystemsFileUplinkBufferManager
+    instance subsystemsStaticMemory
+    # instance subsystemsFileUplink
+
+    # gps components
+    instance gps
+    instance gps_comm
 
     # ----------------------------------------------------------------------
     # Pattern graph specifiers
@@ -59,7 +65,7 @@ module NavigationDeploy {
 
     text event connections instance textLogger
 
-    time connections instance chronoTime
+    time connections instance chronoTime # linuxTime (?)
 
     health connections instance $health
 
@@ -112,6 +118,7 @@ module NavigationDeploy {
       rateGroup3.RateGroupMemberOut[0] -> $health.Run
       rateGroup3.RateGroupMemberOut[1] -> blockDrv.Sched
       rateGroup3.RateGroupMemberOut[2] -> bufferManager.schedIn
+      rateGroup3.RateGroupMemberOut[3] -> subsystemsFileUplinkBufferManager.schedIn
     }
 
     connections Sequencer {
@@ -136,32 +143,18 @@ module NavigationDeploy {
       fileUplink.bufferSendOut -> bufferManager.bufferSendIn
     }
 
-    connections NavigationDeploy {
-      # Add here connections to user-defined components
-      # GpsUart.deallocate -> Gps.serialRecv
-      GpsUart.$recv -> Gps.serialRecv
-      # Gps.serialBufferOut -> GpsUart.allocate
-      # GpsUart.allocate -> Gps.read
-      # GpsUart.deallocate -> Gps.serialRecv
-    }
+    # connections SubsystemsSharedRessources {
+    #   subsystemsFileUplink.bufferSendOut -> subsystemsFileUplinkBufferManager.bufferSendIn
+    # }
 
-    connections Gps {
-      Gps.cmdRegOut -> cmdDisp.compCmdReg
-      cmdDisp.compCmdSend -> Gps.cmdIn
-      Gps.cmdResponseOut -> cmdDisp.compCmdStat
-      # Gps.eventOut[0] -> eventLogger.LogRecv[0] # error
-      GpsUart.Log -> eventLogger.LogRecv
-      GpsUart.LogText -> textLogger.TextLogger
-      # Gps.textEventOut[0] -> textLogger.TextLogger[0] # error
-      fileDownlink.textEventOut -> textLogger.TextLogger
-      # Gps.tlmOut[0] -> chanTlm.TlmRecv[0] # error
-      # GpsUart.Tlm[0] -> chanTlm.TlmRecv[0] # error
-      # GpsUart.Time[0] -> linuxTime.timeGetPort[0] # error
-      # Gps.Time[0] -> linuxTime.timeGetPort[0] # error
-      # blockDrv.Time[0] -> linuxTime.timeGetPort[0] # error
-      # GpsUart.serialRecv[0] -> Gps.serialRecv[0]
-      # Gps.serialBufferOut[0] -> GpsUart.readBufferSend[0]
-    }
+     connections gps {
+      gps.$send -> gps_comm.$send 
+      gps.allocate -> subsystemsFileUplinkBufferManager.bufferGetCallee
+      gps.deallocate -> subsystemsFileUplinkBufferManager.bufferSendIn
+      gps_comm.deallocate -> subsystemsFileUplinkBufferManager.bufferSendIn
+      gps_comm.allocate -> subsystemsFileUplinkBufferManager.bufferGetCallee
+      gps_comm.$recv -> gps.$recv
+     }
 
   }
 

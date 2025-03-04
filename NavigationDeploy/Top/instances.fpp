@@ -8,7 +8,6 @@ module NavigationDeploy {
     constant QUEUE_SIZE = 10
     constant STACK_SIZE = 64 * 1024
   }
-  
 
   # ----------------------------------------------------------------------
   # Active component instances
@@ -88,16 +87,22 @@ module NavigationDeploy {
     stack size Default.STACK_SIZE \
     priority 96
 
-  instance Gps: Gnc.GPS base id 0x321 \
-    queue size Default.QUEUE_SIZE \
+  instance gps: Gnc.GPS base id 0x0E30 \
+  queue size Default.QUEUE_SIZE \
+  stack size Default.STACK_SIZE \
+  priority 95
+
+  instance gps_comm: Drv.LinuxUartDriver base id 0x1030
+  
+  ## subsystems Shares Ressources
+  instance subsystemsFileUplink: Svc.FileUplink base id 0x1300 \
+    queue size 100 \
     stack size Default.STACK_SIZE \
-    priority 95 {
-      phase Fpp.ToCpp.Phases.configComponents """
-      Gps.start();
-      GpsUart.start();
-      (void) printf("serial thread ok\n");
-      """
-    }
+    priority 100
+
+  instance subsystemsFileUplinkBufferManager: Svc.BufferManager base id 0x1400
+  
+  instance subsystemsStaticMemory: Svc.StaticMemory base id 0x1500
 
   # ----------------------------------------------------------------------
   # Queued component instances
@@ -123,6 +128,10 @@ module NavigationDeploy {
 
   instance chronoTime: Svc.ChronoTime base id 0x4500
 
+  # instance linuxTime: Svc.Time base id 0x4500 \
+  #   type "Svc::LinuxTime" \
+  #   at "../../Svc/LinuxTime/LinuxTime.hpp"
+
   instance rateGroupDriver: Svc.RateGroupDriver base id 0x4600
 
   instance textLogger: Svc.PassiveTextLogger base id 0x4800
@@ -133,19 +142,4 @@ module NavigationDeploy {
 
   instance comStub: Svc.ComStub base id 0x4B00
 
-  instance GpsUart: Drv.LinuxUartDriver base id 0x481 {
-    phase Fpp.ToCpp.Phases.configComponents """
-    if (!GpsUart.open("/dev/ttyAMA1", Drv::LinuxUartDriver::BAUD_9600, Drv::LinuxUartDriver::NO_FLOW, Drv::LinuxUartDriver::PARITY_NONE, true)){
-      Fw::Logger::log("[ERROR] Failed to open GPS UART\\n");
-      // bool uart_connected = false;
-    } else {
-      Fw::Logger::log("[INFO] Opened GPS UART\\n");
-      // uart_connected = true;
-    }
-    """
-  }
-
-  # instance comm: Drv.ByteStreamDriverModel base id 0x621
-
-  instance staticMemory: Svc.StaticMemory base id 0x661
 }

@@ -26,6 +26,7 @@ namespace NavigationDeploy {
 struct TopologyState {
     const CHAR* hostname;
     U16 port;
+    const CHAR* gpsComm;
 };
 
 /**
